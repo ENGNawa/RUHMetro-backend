@@ -10,6 +10,11 @@ class LineViewSet(viewsets.ModelViewSet):
     queryset = Line.objects.all().order_by("code")
     serializer_class = LineSerializer
 
+    @action(detail=True, methods=["get"], url_path="stations")
+    def stations(self, request, pk=None):
+        qs = Station.objects.select_related("line").filter(line_id=pk).order_by("code")
+        data = StationSerializer(qs, many=True).data
+        return Response(data, status=200)
 class StationViewSet(viewsets.ModelViewSet):
     queryset: QuerySet[Station] = Station.objects.select_related("line").all().order_by("code")
     serializer_class = StationSerializer
