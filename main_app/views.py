@@ -2,10 +2,11 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.db.models import QuerySet
 from .models import Line, Station
-from .serializers import LineSerializer, StationSerializer, RegisterSerializer
+from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer
 import math
 
 class RegisterView(APIView):
@@ -16,6 +17,13 @@ class RegisterView(APIView):
             return Response({"message": "User registered", "username": user.username}, status=201)
         return Response(s.errors, status=400)
 
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        s = MeSerializer(request.user)
+        return Response(s.data, status=200)
+    
 class LineViewSet(viewsets.ModelViewSet):
     queryset = Line.objects.all().order_by("code")
     serializer_class = LineSerializer
