@@ -26,3 +26,8 @@ class StationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Station
         fields = ["id", "name", "code", "lat", "lng", "line", "line_id"]
+
+class MeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "username", "email"]
