@@ -5,9 +5,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.db.models import QuerySet
-from .models import Line, Station, Category
-from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer, CategorySerializer
-from .permissions import IsAdminOrReadOnly
+from .models import Line, Station, Category, Place
+from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer, CategorySerializer, PlaceSerializer
+from .permissions import IsAdminOrReadOnly, IsOwnerOrAdminOrReadOnly
 import math
 
 class RegisterView(APIView):
@@ -80,3 +80,51 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all().order_by("name")
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    R = 6371.0
+    lat1, lon1, lat2, lon2 = map(float, (lat1, lon1, lat2, lon2))
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi/2)*2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)*2
+    return 2*R*math.asin(math.sqrt(a))
+
+class PlaceViewSet(viewsets.ModelViewSet):
+    queryset = Place.objects.select_related(
+        "category", "nearest_station", "nearest_station__line"
+    ).all()
+    serializer_class = PlaceSerializer
+    permission_classes = [IsOwnerOrAdminOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+
+        cat_id = request.query_params.get("category_id")
+        if cat_id:
+            qs = qs.filter(category_id=cat_id)
+
+        lat = request.query_params.get("lat")
+        lng = request.query_params.get("lng")
+
+        data = PlaceSerializer(qs, many=True).data
+        if lat and lng:
+            try:
+                lat = float(lat)
+                lng = float(lng)
+            except ValueError:
+                return Response(data, status=200)
+
+            for item in data:
+                try:
+                    d = haversine_km(lat, lng, float(item["lat"]), float(item["lng"]))
+                    item["distance_km"] = round(d, 3)
+                except:
+                    item["distance_km"] = None
+
+            data.sort(key=lambda x: (x.get("distance_km") is None, x.get("distance_km")))
+
+        return Response(data, status=200)
