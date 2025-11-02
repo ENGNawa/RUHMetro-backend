@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import Line, Station, Category
+from .models import Line, Station, Category, Place
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
@@ -36,3 +37,42 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ["id", "name", "code"]
+
+class StationMiniSerializer(serializers.ModelSerializer):
+    line = serializers.CharField(source="line.code", read_only=True)
+    class Meta:
+        model = Station
+        fields = ["id", "name", "code", "line"]
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "name", "code"]
+
+class PlaceSerializer(serializers.ModelSerializer):
+    category_detail = CategorySerializer(source="category", read_only=True)
+    nearest_station_detail = StationMiniSerializer(source="nearest_station", read_only=True)
+    distance_km = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Place
+        fields = [
+            "id", "name", "description",
+            "category", "category_detail",
+            "nearest_station", "nearest_station_detail",
+            "lat", "lng",
+            "created_by", "created_at",
+            "distance_km",
+        ]
+        read_only_fields = ["created_by", "created_at", "distance_km"]
+
+    def validate(self, attrs):
+        lat = attrs.get("lat", getattr(self.instance, "lat", None))
+        lng = attrs.get("lng", getattr(self.instance, "lng", None))
+        if lat is None or lng is None:
+            raise ValidationError("lat and lng are required")
+        if not (-90 <= float(lat) <= 90):
+            raise ValidationError("lat must be between -90 and 90")
+        if not (-180 <= float(lng) <= 180):
+            raise ValidationError("lng must be between -180 and 180")
+        return attrs
