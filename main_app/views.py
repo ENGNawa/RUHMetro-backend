@@ -7,6 +7,7 @@ from rest_framework import status
 from django.db.models import QuerySet
 from .models import Line, Station
 from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer
+from .permissions import IsAdminOrReadOnly
 import math
 
 class RegisterView(APIView):
@@ -27,6 +28,7 @@ class MeView(APIView):
 class LineViewSet(viewsets.ModelViewSet):
     queryset = Line.objects.all().order_by("code")
     serializer_class = LineSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
     @action(detail=True, methods=["get"], url_path="stations")
     def stations(self, request, pk=None):
@@ -37,6 +39,7 @@ class LineViewSet(viewsets.ModelViewSet):
 class StationViewSet(viewsets.ModelViewSet):
     queryset: QuerySet[Station] = Station.objects.select_related("line").all().order_by("code")
     serializer_class = StationSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 # got the idea from a github example about nearest location
 # it uses lat & lng with haversine formula to find closest stations
