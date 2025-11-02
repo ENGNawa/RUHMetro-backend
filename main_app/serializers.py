@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Line, Station
+from .models import Line, Station, Category
 from django.contrib.auth.models import User
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -31,3 +31,8 @@ class MeSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "is_staff", "is_superuser"]
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "name", "code"]
