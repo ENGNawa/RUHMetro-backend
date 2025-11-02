@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 class Line(models.Model):
     name = models.CharField(max_length=100)
@@ -24,3 +25,19 @@ class Category(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.code})"
+
+class Place(models.Model):
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="places")
+    nearest_station = models.ForeignKey(Station, on_delete=models.SET_NULL, null=True, blank=True, related_name="places")
+    lat = models.DecimalField(max_digits=15, decimal_places=7)
+    lng = models.DecimalField(max_digits=15, decimal_places=7)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="places")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
