@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.db.models import QuerySet
-from .models import Line, Station
-from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer
+from .models import Line, Station, Category
+from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer, CategorySerializer
 from .permissions import IsAdminOrReadOnly
 import math
 
@@ -75,3 +75,8 @@ class StationViewSet(viewsets.ModelViewSet):
             item["distance_km"] = round(d, 3)
             data.append(item)
         return Response(data, status=200)
+    
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all().order_by("name")
+    serializer_class = CategorySerializer
+    permission_classes = [IsAdminOrReadOnly]
