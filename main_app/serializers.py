@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Line, Station, Category, Place, Post
+from .models import Line, Station, Category, Place, Post, Comment, Rating
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
@@ -89,3 +89,78 @@ class PostSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
         ]
         read_only_fields = ["created_by", "author", "created_at", "updated_at"]
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(source="created_by.username", read_only=True)
+    class Meta:
+        model = Comment
+        fields = ["id", "post", "body", "created_by", "author", "created_at"]
+        read_only_fields = ["created_by", "author", "created_at"]
+
+class RatingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Rating
+        fields = ["id", "post", "value", "created_by", "created_at"]
+        read_only_fields = ["created_by", "created_at"]
+    def validate_value(self, v):
+        if v < 1 or v > 5:
+            raise ValidationError("rating must be 1..5")
+        return v
+class PostPublicSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(source="created_by.username", read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+    ratings_count  = serializers.IntegerField(read_only=True)
+    avg_rating     = serializers.FloatField(read_only=True)
+
+    place   = serializers.SerializerMethodField()
+    station = serializers.SerializerMethodField()
+    my_rating = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = [
+            "id","title","body","image",
+            "place","station",
+            "author","created_at","updated_at",
+            "comments_count","ratings_count","avg_rating",
+            "my_rating",
+        ]
+
+    def get_place(self, obj):
+        if obj.place:
+            return {"id": obj.place.id, "name": obj.place.name}
+        return None
+
+    def get_station(self, obj):
+        if obj.station:
+            return {"id": obj.station.id, "code": obj.station.code}
+        return None
+
+    def get_my_rating(self, obj):
+        req = self.context.get("request")
+        if not req or not req.user.is_authenticated:
+            return None
+        r = obj.ratings.filter(created_by=req.user).first()
+        return getattr(r, "value", None)
+
+class PostOwnerSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(source="created_by.username", read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+    ratings_count  = serializers.IntegerField(read_only=True)
+    avg_rating     = serializers.FloatField(read_only=True)
+    my_rating      = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = [
+            "id","title","body","image","station","place",
+            "author","created_at","updated_at",
+            "comments_count","ratings_count","avg_rating","my_rating",
+        ]
+
+    def get_my_rating(self, obj):
+        req = self.context.get("request")
+        if not req or not req.user.is_authenticated:
+            return None
+        r = obj.ratings.filter(created_by=req.user).values_list("value", flat=True).first()
+        return r
