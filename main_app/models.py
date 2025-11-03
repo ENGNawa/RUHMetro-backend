@@ -56,3 +56,21 @@ class Post(models.Model):
         ordering = ["-created_at"]
     def _str_(self): return self.title
 
+class Comment(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
+    body = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-created_at"]
+
+class Rating(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="ratings")
+    value = models.PositiveSmallIntegerField()
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="ratings")
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        unique_together = ("post", "created_by")
+        ordering = ["-created_at"]
+
+
