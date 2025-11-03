@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Line, Station, Category, Place
+from .models import Line, Station, Category, Place, Post
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
@@ -76,3 +76,16 @@ class PlaceSerializer(serializers.ModelSerializer):
         if not (-180 <= float(lng) <= 180):
             raise ValidationError("lng must be between -180 and 180")
         return attrs
+
+class PostSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = Post
+        fields = [
+            "id", "title", "body", "image",
+            "station", "place",
+            "created_by", "author",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["created_by", "author", "created_at", "updated_at"]
