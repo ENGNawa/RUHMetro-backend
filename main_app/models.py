@@ -41,3 +41,18 @@ class Place(models.Model):
 
     def __str__(self):
         return self.name
+
+class Post(models.Model):
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True)
+    image = models.ImageField(upload_to="posts/", null=True, blank=True)
+    station = models.ForeignKey("Station", on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")
+    place = models.ForeignKey("Place", on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")
+    is_public = models.BooleanField(default=True)  # NEW
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering = ["-created_at"]
+    def _str_(self): return self.title
+
