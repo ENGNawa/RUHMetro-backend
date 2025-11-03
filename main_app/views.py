@@ -4,10 +4,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from django.db.models import QuerySet
-from .models import Line, Station, Category, Place
-from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer, CategorySerializer, PlaceSerializer
+from django.db.models import QuerySet, Q, Count, Avg
+from .models import Line, Station, Category, Place, Post
+from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer, CategorySerializer, PlaceSerializer, PostSerializer
 from .permissions import IsAdminOrReadOnly, IsOwnerOrAdminOrReadOnly
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 import math
 
 class RegisterView(APIView):
@@ -128,3 +129,36 @@ class PlaceViewSet(viewsets.ModelViewSet):
             data.sort(key=lambda x: (x.get("distance_km") is None, x.get("distance_km")))
 
         return Response(data, status=200)
+    
+
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.select_related("station","place","created_by").all()
+    serializer_class = PostSerializer
+    permission_classes = [IsOwnerOrAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "list" and not self.request.user.is_staff:
+            qs = qs.filter(created_by=self.request.user)
+
+        q = self.request.query_params.get("q")
+        station_id = self.request.query_params.get("station_id")
+        place_id = self.request.query_params.get("place_id")
+        if q:
+            qs = qs.filter(Q(title_icontains=q) | Q(body_icontains=q))
+        if station_id:
+            qs = qs.filter(station_id=station_id)
+        if place_id:
+            qs = qs.filter(place_id=place_id)
+
+        if self.action == "list":
+            qs = qs.annotate(
+                comments_count=Count("comments"),
+                ratings_count=Count("ratings"),
+                avg_rating=Avg("ratings__value"),
+            ).order_by("-created_at")
+        else:
+            qs = qs.order_by("-created_at")
+        return qs
+
