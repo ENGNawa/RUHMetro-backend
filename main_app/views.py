@@ -2,11 +2,11 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework import status
 from django.db.models import QuerySet, Q, Count, Avg
-from .models import Line, Station, Category, Place, Post
-from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer, CategorySerializer, PlaceSerializer, PostSerializer
+from .models import Line, Station, Category, Place, Post, Comment, Rating
+from .serializers import LineSerializer, StationSerializer, RegisterSerializer, MeSerializer, CategorySerializer, PlaceSerializer, PostSerializer, CommentSerializer, RatingSerializer, PostPublicSerializer, PostOwnerSerializer
 from .permissions import IsAdminOrReadOnly, IsOwnerOrAdminOrReadOnly
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 import math
@@ -88,7 +88,7 @@ def haversine_km(lat1, lon1, lat2, lon2):
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi/2)*2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)*2
+    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
     return 2*R*math.asin(math.sqrt(a))
 
 class PlaceViewSet(viewsets.ModelViewSet):
@@ -162,3 +162,72 @@ class PostViewSet(viewsets.ModelViewSet):
             qs = qs.order_by("-created_at")
         return qs
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PostOwnerSerializer
+        return PostSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+class ExploreViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = PostPublicSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        qs = (
+            Post.objects.filter(is_public=True)
+            .select_related("created_by", "station", "place")
+            .annotate(
+                comments_count=Count("comments"),
+                ratings_count=Count("ratings"),
+                avg_rating=Avg("ratings__value"),
+            )
+            .order_by("-created_at")
+        )
+        q = self.request.query_params.get("q")
+        place_id = self.request.query_params.get("place_id")
+        station_id = self.request.query_params.get("station_id")
+        if q:
+            qs = qs.filter(Q(title_icontains=q) | Q(body_icontains=q))
+        if place_id:
+            qs = qs.filter(place_id=place_id)
+        if station_id:
+            qs = qs.filter(station_id=station_id)
+        return qs
+
+class CommentViewSet(viewsets.ModelViewSet):
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    def get_queryset(self):
+        qs = Comment.objects.select_related("created_by","post")
+        post_id = self.request.query_params.get("post_id")
+        if post_id:
+            qs = qs.filter(post_id=post_id)
+        return qs
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+class RatingViewSet(viewsets.ModelViewSet):
+    serializer_class = RatingSerializer
+    permission_classes = [IsAuthenticated]
+    def get_queryset(self):
+        qs = Rating.objects.select_related("created_by","post")
+        post_id = self.request.query_params.get("post_id")
+        if post_id:
+            qs = qs.filter(post_id=post_id)
+        return qs.filter(created_by=self.request.user)
+
+    def perform_create(self, serializer):
+        obj, _created = Rating.objects.update_or_create(
+            post=serializer.validated_data["post"],
+            created_by=self.request.user,
+            defaults={"value": serializer.validated_data["value"]},
+        )
+        self.instance = obj
+
+    def create(self, request, *args, **kwargs):
+        s = self.get_serializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        self.perform_create(s)
+        return Response(self.get_serializer(self.instance).data, status=status.HTTP_201_CREATED)
