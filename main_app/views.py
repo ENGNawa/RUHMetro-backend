@@ -107,6 +107,9 @@ class PlaceViewSet(viewsets.ModelViewSet):
         cat_id = request.query_params.get("category_id")
         if cat_id:
             qs = qs.filter(category_id=cat_id)
+        station_id = request.query_params.get("station_id")
+        if station_id:
+            qs = qs.filter(nearest_station_id=station_id)
 
         lat = request.query_params.get("lat")
         lng = request.query_params.get("lng")
