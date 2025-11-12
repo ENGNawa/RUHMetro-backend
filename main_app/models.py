@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 class Line(models.Model):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=10, unique=True)
-    color = models.CharField(max_length=7)  # "#00AEEF"
+    color = models.CharField(max_length=7)  # "#
 
     def __str__(self):
         return f"{self.code} - {self.name}"
